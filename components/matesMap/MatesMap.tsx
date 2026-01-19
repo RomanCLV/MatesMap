@@ -13,7 +13,7 @@ export interface Coordinate {
 
 export interface MatesMapProps {
   startupLocation?: Coordinate,
-  coordinates?: [Coordinate];
+  coordinates?: Coordinate[];
   mapStyle?: string;
   icon?: any;
 }
