@@ -1,10 +1,12 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { MapView, PointAnnotation } from "@maplibre/maplibre-react-native";
 
 import { StyleSheet, View, Image } from "react-native";
 import type { Feature } from "geojson";
 
 import MapMarker from "@assetsMap/marker.png"
+
+type LngLat = [number, number];
 
 export interface Coordinate {
   lgn: number,
@@ -25,26 +27,27 @@ export default function MatesMap({
     icon,
     } : MatesMapProps) {
 
+  const parisCoordinate: LngLat = [2.3522, 48.8566];
   const [markers, setMarkers] = useState([
-    { id: "marker-initial", coordinate: [2.3522, 48.8566] as [number, number] }
+    { id: "marker-initial", coordinate: parisCoordinate },
   ]);
 
-  const handleMapPress = (feature: Feature) => {
-    if (feature.geometry.type === 'Point') {
-      const coordinates = feature.geometry.coordinates as [number, number];
-      
-      setMarkers([...markers, {
-        id: `marker-${Date.now()}`,
-        coordinate: coordinates
-      }]);
-    }
-  };
+  const handleLongPress = useCallback((e: any) => {
+    // e.geometry.coordinates est le plus fiable pour récupérer la position pressée
+    const pressed = e?.geometry?.coordinates as LngLat | undefined;
+    if (!pressed || pressed.length !== 2) return;
+
+    setMarkers((prev) => [
+      ...prev,
+      { id: `marker-${Date.now()}`, coordinate: pressed },
+    ]);
+  }, []);
 
   return (
     <MapView
       mapStyle={mapStyle}
       style={styles.map}
-      onLongPress={handleMapPress}
+      onLongPress={handleLongPress}
     >
       {markers.map((marker) => (
         <PointAnnotation 
