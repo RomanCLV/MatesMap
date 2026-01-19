@@ -2,7 +2,6 @@ import React, { useState, useCallback } from "react";
 import { MapView, PointAnnotation } from "@maplibre/maplibre-react-native";
 
 import { StyleSheet, View, Image } from "react-native";
-import type { Feature } from "geojson";
 
 import MapMarker from "@assetsMap/marker.png"
 
