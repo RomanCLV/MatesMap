@@ -30,7 +30,7 @@ export default function Home() {
           trail: MarkerGreen,
         },
         style: {
-          iconSize: 0.9,
+          iconSize: 0.05,
         },
       }}
     />
