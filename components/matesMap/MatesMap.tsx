@@ -20,7 +20,6 @@ import { CameraStops } from "node_modules/@maplibre/maplibre-react-native/lib/ty
 
 import type { Feature, FeatureCollection } from "geojson";
 
-
 import {
   ClusterConfig,
   IconConfig,
@@ -34,6 +33,8 @@ import {
   defaultClusterText,
   defaultSymbolStyle,
 } from "./defaultStyles";
+
+const DEFAULT_ZOOM = 10;
 
 export interface MatesMapHandle {
   // Méthodes custom
@@ -111,7 +112,7 @@ const MatesMap = forwardRef<MatesMapHandle, MatesMapProps>(
               startupLocation.location.lng,
               startupLocation.location.lat,
             ],
-            zoomLevel: startupLocation.zoom ?? 10,
+            zoomLevel: startupLocation.zoom ?? DEFAULT_ZOOM,
             animationDuration: 1000,
           });
         }
@@ -141,7 +142,8 @@ const MatesMap = forwardRef<MatesMapHandle, MatesMapProps>(
       const isCluster = feature.properties?.point_count != null;
       if (isCluster) {
         onPressCluster?.(feature);
-      } else {
+      }
+      else {
         onPressFeature?.(feature);
       }
     };
@@ -153,7 +155,7 @@ const MatesMap = forwardRef<MatesMapHandle, MatesMapProps>(
           defaultSettings={
             startupLocation
               ? {
-                  zoomLevel: startupLocation.zoom ?? 10,
+                  zoomLevel: startupLocation.zoom ?? DEFAULT_ZOOM,
                   centerCoordinate: [
                     startupLocation.location.lng,
                     startupLocation.location.lat,
