@@ -3,9 +3,10 @@ import React, { useMemo, useRef, useState } from "react";
 import MatesMap, { MapLocation, MatesMapHandle } from "@components/matesMap";
 import { activitiesToFeatureCollection, generateActivities } from "utils/activity.utils";
 
-import MarkerRed from "@assetsMap/marker-red.png";
-import MarkerGreen from "@assetsMap/marker-green.png";
-import MarkerBlue from "@assetsMap/marker-blue.png";
+import matesMapStyle from "@assetsMap/styles/matesMapStyle.json";
+import MarkerRed from "@assetsMap/icons/marker-red.png";
+import MarkerGreen from "@assetsMap/icons/marker-green.png";
+import MarkerBlue from "@assetsMap/icons/marker-blue.png";
 import { Activity } from "types/activity";
 import ThemedView from "@components/themedComponents/ThemedView";
 import ThemedBottomSheetModal from "@components/themedComponents/ThemedBottomSheetModal";
@@ -17,7 +18,7 @@ const PARIS_COORDINATES: MapLocation = { lat: 48.8566, lng: 2.3522 };
 const activities = generateActivities(
   1000,
   PARIS_COORDINATES,
-  0.4
+  0.6
 );
 
 export default function Home() {
@@ -56,6 +57,7 @@ export default function Home() {
         ref={mapRef}
         data={activities}
         toFeatureCollection={activitiesToFeatureCollection}
+        mapStyle={matesMapStyle}
         startupLocation={{
           location: PARIS_COORDINATES,
           zoom: 11,

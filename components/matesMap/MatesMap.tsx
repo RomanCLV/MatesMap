@@ -20,6 +20,7 @@ import { CameraStops } from "node_modules/@maplibre/maplibre-react-native/lib/ty
 
 import type { Feature, FeatureCollection } from "geojson";
 
+
 import {
   ClusterConfig,
   IconConfig,
@@ -54,7 +55,7 @@ export interface MatesMapProps<T = any> {
   data?: T[];
   toFeatureCollection?: ToFeatureCollection<T>;
 
-  mapStyle?: string;
+  mapStyle?: string | object;
   startupLocation?: StartupLocation;
   icons?: IconConfig;
   clusters?: ClusterConfig;
