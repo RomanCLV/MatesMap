@@ -135,7 +135,7 @@
         false
       ],
       "paint": {
-        "fill-color": "rgba(20, 77, 45, 0.7)",
+        "fill-color": "rgba(18, 48, 31, 0.7)",
         "fill-opacity": [
           "interpolate",
           ["exponential", 1.8],
