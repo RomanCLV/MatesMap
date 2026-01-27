@@ -11,7 +11,7 @@ import MarkerBlue from "@assetsMap/icons/marker-blue.png";
 import { Activity } from "types/activity";
 import ThemedView from "@components/themedComponents/ThemedView";
 import ThemedBottomSheetModal from "@components/themedComponents/ThemedBottomSheetModal";
-import { CardActivity } from "@components/map/CardActivity";
+import { CardActivity } from "@components/activities/CardActivity";
 import { useT } from "@i18n/useT";
 import { useTheme } from "@hooks/useTheme";
 
