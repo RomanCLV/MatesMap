@@ -9,6 +9,7 @@ import {
   ViewStyle,
   NativeSyntheticEvent,
   NativeScrollEvent,
+  ScrollView,
 } from "react-native";
 import { useTheme } from "@hooks/useTheme";
 
@@ -26,6 +27,7 @@ interface SlidingPanelProps<T> {
   reducedHeight?: number;
   fullHeight?: number;
   containerStyle?: ViewStyle;
+  fullModeTopMargin?: number;
 }
 
 const clamp = (value: number, min: number, max: number) =>
@@ -40,16 +42,20 @@ export default function SlidingPanel<T>({
   keyExtractor,
   renderReducedItem,
   renderFullItem,
-  reducedHeight,
+  reducedHeight = 180,
   fullHeight,
   containerStyle,
+  fullModeTopMargin = 60,
 }: SlidingPanelProps<T>) {
   const theme = useTheme();
   const { width, height } = useWindowDimensions();
+  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollY = useRef(0);
 
+  // Hauteur maximale en mode full = hauteur écran - marge du haut
   const resolvedFullHeight = Math.max(
     0,
-    (fullHeight ?? height) || 0
+    (fullHeight ?? height - fullModeTopMargin) || 0
   );
   const resolvedReducedHeight = Math.min(
     resolvedFullHeight,
@@ -58,11 +64,11 @@ export default function SlidingPanel<T>({
 
   const snapPoints = useMemo(
     () => ({
-      full: 0,
-      reduced: resolvedFullHeight - resolvedReducedHeight,
-      hidden: resolvedFullHeight,
+      full: fullModeTopMargin, // Position avec marge en haut
+      reduced: height - resolvedReducedHeight,
+      hidden: height,
     }),
-    [resolvedFullHeight, resolvedReducedHeight]
+    [height, resolvedReducedHeight, fullModeTopMargin]
   );
 
   const translateY = useRef(new Animated.Value(snapPoints.hidden)).current;
@@ -94,6 +100,14 @@ export default function SlidingPanel<T>({
       animated: false,
     });
   }, [index, state, width]);
+
+  // Reset scroll position when opening in full mode
+  useEffect(() => {
+    if (state === "full") {
+      scrollY.current = 0;
+      scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+    }
+  }, [state]);
 
   const snapTo = (next: SlidingPanelState, velocityY?: number) => {
     Animated.spring(translateY, {
@@ -137,8 +151,13 @@ export default function SlidingPanel<T>({
   const panResponder = useMemo(
     () =>
       PanResponder.create({
-        onMoveShouldSetPanResponder: (_, gesture) =>
-          Math.abs(gesture.dy) > 4 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+        onMoveShouldSetPanResponder: (_, gesture) => {
+          // En mode full, permettre le drag seulement si on est en haut du scroll
+          if (state === "full" && scrollY.current > 5) {
+            return false;
+          }
+          return Math.abs(gesture.dy) > 4 && Math.abs(gesture.dy) > Math.abs(gesture.dx);
+        },
         onPanResponderGrant: () => {
           translateY.stopAnimation();
           dragStartY.current = currentTranslateY.current;
@@ -159,12 +178,16 @@ export default function SlidingPanel<T>({
           snapTo(state);
         },
       }),
-    [snapPoints.full, snapPoints.hidden, snapPoints.reduced, snapTo, translateY]
+    [snapPoints.full, snapPoints.hidden, snapPoints.reduced, state, snapTo, translateY]
   );
 
   const onScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const nextIndex = Math.round(e.nativeEvent.contentOffset.x / width);
     if (nextIndex !== index) onIndexChange(nextIndex);
+  };
+
+  const onScrollFull = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    scrollY.current = e.nativeEvent.contentOffset.y;
   };
 
   const renderReduced = () => (
@@ -209,7 +232,7 @@ export default function SlidingPanel<T>({
           styles.sheet,
           containerStyle,
           {
-            height: resolvedFullHeight,
+            height: height - fullModeTopMargin,
             backgroundColor: theme.background.surface,
             transform: [{ translateY }],
           },
@@ -223,9 +246,13 @@ export default function SlidingPanel<T>({
 
         {state === "full" && currentItem !== undefined && (
           <Animated.ScrollView
+            ref={scrollViewRef}
             style={styles.fullScroll}
             contentContainerStyle={styles.fullContent}
             showsVerticalScrollIndicator
+            scrollEventThrottle={16}
+            onScroll={onScrollFull}
+            bounces={true}
           >
             {renderFullItem(currentItem, index)}
           </Animated.ScrollView>

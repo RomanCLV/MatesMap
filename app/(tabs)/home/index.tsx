@@ -13,6 +13,7 @@ import { CardActivity } from "@components/activities/CardActivity";
 import { useTheme } from "@hooks/useTheme";
 import SlidingPanel, { SlidingPanelState } from "@components/panel/SlidingPanel";
 import { ActivityDetail } from "@components/activities/ActivityDetail";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const PARIS_COORDINATES: MapLocation = { lat: 48.8566, lng: 2.3522 };
 
@@ -27,6 +28,7 @@ export default function Home() {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [panelState, setPanelState] = useState<SlidingPanelState>("hidden");
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
 
   const activityById = useMemo(() => {
     return Object.fromEntries(activities.map((a, i) => [a.id, i]));
@@ -92,7 +94,8 @@ export default function Home() {
           keyExtractor={(item) => item.id}
           renderReducedItem={(item) => <CardActivity activity={item} />}
           renderFullItem={(item) => <ActivityDetail activity={item} />}
-          reducedHeight={180}
+          reducedHeight={280}
+          fullModeTopMargin={insets.top + 30}
         />
       )}
     </ThemedView>
