@@ -14,6 +14,7 @@ import {
 import { useTheme } from "@hooks/useTheme";
 
 export type SlidingPanelState = "hidden" | "reduced" | "full";
+export type TransitionMode = "crossfade" | "slide" | "instant" | "custom";
 
 interface SlidingPanelProps<T> {
   state: SlidingPanelState;
@@ -22,11 +23,21 @@ interface SlidingPanelProps<T> {
   index: number;
   onIndexChange: (nextIndex: number) => void;
   keyExtractor: (item: T, index: number) => string;
-  renderReducedItem: (item: T, index: number) => React.ReactNode;
-  renderFullItem: (item: T, index: number) => React.ReactNode;
+  
+  /** Mode de transition entre reduced et full (default: "crossfade") */
+  transitionMode?: TransitionMode;
+  
+  /** Utilisé pour les modes crossfade, instant, slide */
+  renderReducedItem?: (item: T, index: number) => React.ReactNode;
+  renderFullItem?: (item: T, index: number) => React.ReactNode;
+  
+  /** Utilisé uniquement pour le mode custom - progress va de 0 (reduced) à 1 (full) */
+  renderCustomItem?: (item: T, index: number, progress: Animated.AnimatedInterpolation<number>) => React.ReactNode;
+  
   reducedHeight?: number;
   fullHeight?: number;
   containerStyle?: ViewStyle;
+  /** Marge en haut pour garder la zone de grab accessible en mode full (default: 60) */
   fullModeTopMargin?: number;
 }
 
@@ -40,9 +51,11 @@ export default function SlidingPanel<T>({
   index,
   onIndexChange,
   keyExtractor,
+  transitionMode = "crossfade",
   renderReducedItem,
   renderFullItem,
-  reducedHeight = 180,
+  renderCustomItem,
+  reducedHeight,
   fullHeight,
   containerStyle,
   fullModeTopMargin = 60,
@@ -51,6 +64,14 @@ export default function SlidingPanel<T>({
   const { width, height } = useWindowDimensions();
   const scrollViewRef = useRef<ScrollView>(null);
   const scrollY = useRef(0);
+
+  // Validation des props selon le mode
+  if (transitionMode === "custom" && !renderCustomItem) {
+    console.warn("SlidingPanel: transitionMode is 'custom' but renderCustomItem is not provided");
+  }
+  if (transitionMode !== "custom" && (!renderReducedItem || !renderFullItem)) {
+    console.warn("SlidingPanel: renderReducedItem and renderFullItem are required for non-custom modes");
+  }
 
   // Hauteur maximale en mode full = hauteur écran - marge du haut
   const resolvedFullHeight = Math.max(
@@ -64,7 +85,7 @@ export default function SlidingPanel<T>({
 
   const snapPoints = useMemo(
     () => ({
-      full: fullModeTopMargin, // Position avec marge en haut
+      full: fullModeTopMargin,
       reduced: height - resolvedReducedHeight,
       hidden: height,
     }),
@@ -75,6 +96,15 @@ export default function SlidingPanel<T>({
   const currentTranslateY = useRef(snapPoints.hidden);
   const dragStartY = useRef(snapPoints.hidden);
   const listRef = useRef<FlatList<T>>(null);
+
+  // Progress animé : 0 = reduced, 1 = full
+  const transitionProgress = useMemo(() => {
+    return translateY.interpolate({
+      inputRange: [snapPoints.full, snapPoints.reduced],
+      outputRange: [1, 0],
+      extrapolate: "clamp",
+    });
+  }, [translateY, snapPoints.full, snapPoints.reduced]);
 
   useEffect(() => {
     const subId = translateY.addListener(({ value }) => {
@@ -216,13 +246,169 @@ export default function SlidingPanel<T>({
       }}
       renderItem={({ item, index: itemIndex }) => (
         <View style={[styles.reducedItem, { width }]}>
-          {renderReducedItem(item, itemIndex)}
+          {renderReducedItem?.(item, itemIndex)}
         </View>
       )}
     />
   );
 
   const currentItem = data[index];
+
+  // Rendu selon le mode de transition
+  const renderContent = () => {
+    if (!currentItem) return null;
+
+    // Mode custom : un seul render avec progress
+    if (transitionMode === "custom" && renderCustomItem) {
+      return (
+        <Animated.ScrollView
+          ref={scrollViewRef}
+          style={styles.fullScroll}
+          contentContainerStyle={styles.fullContent}
+          showsVerticalScrollIndicator
+          scrollEventThrottle={16}
+          onScroll={onScrollFull}
+          bounces={true}
+        >
+          {renderCustomItem(currentItem, index, transitionProgress)}
+        </Animated.ScrollView>
+      );
+    }
+
+    // Mode instant : affichage conditionnel classique
+    if (transitionMode === "instant") {
+      return (
+        <>
+          {state === "reduced" && renderReduced()}
+          {state === "full" && (
+            <Animated.ScrollView
+              ref={scrollViewRef}
+              style={styles.fullScroll}
+              contentContainerStyle={styles.fullContent}
+              showsVerticalScrollIndicator
+              scrollEventThrottle={16}
+              onScroll={onScrollFull}
+              bounces={true}
+            >
+              {renderFullItem?.(currentItem, index)}
+            </Animated.ScrollView>
+          )}
+        </>
+      );
+    }
+
+    // Mode crossfade : les deux vues avec opacité animée
+    if (transitionMode === "crossfade") {
+      const reducedOpacity = transitionProgress.interpolate({
+        inputRange: [0, 1],
+        outputRange: [1, 0],
+      });
+
+      const fullOpacity = transitionProgress.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, 1],
+      });
+
+      return (
+        <>
+          <Animated.View
+            style={[
+              StyleSheet.absoluteFill,
+              { opacity: reducedOpacity },
+            ]}
+            pointerEvents={state === "reduced" ? "auto" : "none"}
+          >
+            {renderReduced()}
+          </Animated.View>
+
+          <Animated.View
+            style={[
+              StyleSheet.absoluteFill,
+              { opacity: fullOpacity },
+            ]}
+            pointerEvents={state === "full" ? "auto" : "none"}
+          >
+            <Animated.ScrollView
+              ref={scrollViewRef}
+              style={styles.fullScroll}
+              contentContainerStyle={styles.fullContent}
+              showsVerticalScrollIndicator
+              scrollEventThrottle={16}
+              onScroll={onScrollFull}
+              bounces={true}
+            >
+              {renderFullItem?.(currentItem, index)}
+            </Animated.ScrollView>
+          </Animated.View>
+        </>
+      );
+    }
+
+    // Mode slide : reduced slide vers le haut, full slide depuis le bas
+    if (transitionMode === "slide") {
+      const reducedTranslateY = transitionProgress.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, -50],
+      });
+
+      const reducedOpacity = transitionProgress.interpolate({
+        inputRange: [0, 0.5, 1],
+        outputRange: [1, 0.5, 0],
+      });
+
+      const fullTranslateY = transitionProgress.interpolate({
+        inputRange: [0, 1],
+        outputRange: [50, 0],
+      });
+
+      const fullOpacity = transitionProgress.interpolate({
+        inputRange: [0, 0.5, 1],
+        outputRange: [0, 0.5, 1],
+      });
+
+      return (
+        <>
+          <Animated.View
+            style={[
+              StyleSheet.absoluteFill,
+              {
+                opacity: reducedOpacity,
+                transform: [{ translateY: reducedTranslateY }],
+              },
+            ]}
+            pointerEvents={state === "reduced" ? "auto" : "none"}
+          >
+            {renderReduced()}
+          </Animated.View>
+
+          <Animated.View
+            style={[
+              StyleSheet.absoluteFill,
+              {
+                opacity: fullOpacity,
+                transform: [{ translateY: fullTranslateY }],
+              },
+            ]}
+            pointerEvents={state === "full" ? "auto" : "none"}
+          >
+            <Animated.ScrollView
+              ref={scrollViewRef}
+              style={styles.fullScroll}
+              contentContainerStyle={styles.fullContent}
+              showsVerticalScrollIndicator
+              scrollEventThrottle={16}
+              onScroll={onScrollFull}
+              bounces={true}
+            >
+              {renderFullItem?.(currentItem, index)}
+            </Animated.ScrollView>
+          </Animated.View>
+        </>
+      );
+    }
+
+    return null;
+  };
 
   return (
     <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
@@ -242,21 +428,9 @@ export default function SlidingPanel<T>({
           <View style={[styles.handle, { backgroundColor: theme.border.light }]} />
         </View>
 
-        {state === "reduced" && renderReduced()}
-
-        {state === "full" && currentItem !== undefined && (
-          <Animated.ScrollView
-            ref={scrollViewRef}
-            style={styles.fullScroll}
-            contentContainerStyle={styles.fullContent}
-            showsVerticalScrollIndicator
-            scrollEventThrottle={16}
-            onScroll={onScrollFull}
-            bounces={true}
-          >
-            {renderFullItem(currentItem, index)}
-          </Animated.ScrollView>
-        )}
+        <View style={styles.contentContainer}>
+          {renderContent()}
+        </View>
       </Animated.View>
     </View>
   );
@@ -281,6 +455,9 @@ const styles = StyleSheet.create({
     width: 48,
     height: 5,
     borderRadius: 3,
+  },
+  contentContainer: {
+    flex: 1,
   },
   reducedItem: {
     paddingHorizontal: 16,
